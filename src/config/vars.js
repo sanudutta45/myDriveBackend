@@ -1,7 +1,6 @@
-const dotenvFlow = require("dotenv-flow");
+const dotenvFlow = require("dotenv-flow")
 
-dotenvFlow.config(); //default will take .env file
-
+dotenvFlow.config() //default will take .env file
 
 module.exports = {
   env: process.env.NODE_ENV,
@@ -13,5 +12,6 @@ module.exports = {
   },
   jwtExpirationInterval: process.env.JWT_EXPIRATION_MINUTES,
   jwtRefreshToken: process.env.JWT_REFRESH_TOKEN_DAYS,
-
-};
+  s3AccessKeyId: process.env.S3_ACCESS_KEY_ID,
+  s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+}

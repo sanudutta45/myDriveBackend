@@ -1,4 +1,4 @@
-const { Joi } = require("express-validation");
+const { Joi } = require("express-validation")
 
 module.exports = {
   addfolderSchema: {
@@ -7,4 +7,17 @@ module.exports = {
       path: Joi.array().required(),
     }),
   },
-};
+  renamefolderSchema: {
+    params: Joi.object({
+      folderId: Joi.string().required(),
+    }),
+    body: Joi.object({
+      newName: Joi.string().required(),
+    }),
+  },
+  deletefolderSchema: {
+    params: Joi.object({
+      folderId: Joi.string().required(),
+    }),
+  },
+}

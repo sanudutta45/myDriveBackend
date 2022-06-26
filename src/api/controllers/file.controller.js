@@ -1,60 +1,143 @@
-const Folder = require("../models/folder.model");
+const fileService = require("../services/awsS3.service")
+const Folder = require("../models/folder.model")
 
-const fs = require("fs");
-const multer = require("multer");
-const path = require("path");
+exports.awsFileUploadId = async (req, res) => {
+  const { fileName } = req.params
+  const { sub } = req.user
+  try {
+    const uploadId = await fileService.createUploadId(fileName, sub)
+    res.status(200).json(uploadId)
+  } catch (error) {
+    console.log("Unable to get upload Id", error)
+    res.status(400).json({ error: "Unable to get upload Id" })
+  }
+}
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    if (!fs.existsSync(`./uploads/${req.user.sub}`))
-      fs.mkdirSync(`./uploads/${req.user.sub}`);
+exports.awsPresignedUrlParts = async (req, res) => {
+  const { uploadId, parts, bucketFileName } = req.body
+  const { sub } = req.user
 
-    cb(null, `./uploads/${req.user.sub}`);
-  },
-  filename: function (req, file, cb) {
-    let folderName = req.query.id;
-    if (folderName == "null") folderName = "";
-    cb(
-      null,
-      folderName + "_" + file.fieldname + path.extname(file.originalname)
-    );
-  },
-});
+  try {
+    const partIndexMap = await fileService.getPreSignedPutUrls(
+      sub,
+      bucketFileName,
+      uploadId,
+      parts
+    )
 
-const upload = multer({
-  storage,
-}).single("file");
+    return res.status(200).json(partIndexMap)
+  } catch (error) {
+    console.log("Error for Signed URL", error)
+    return res
+      .status(403)
+      .json({ error: "Failed to create signed url" + error })
+  }
+}
 
-exports.uploadFile = async (req, res) => {
-  upload(req, res, async (err) => {
-    if (err) return res.status(403).json({ error: err });
-    if (req.file == undefined)
-      return res.status(403).json({ error: "No file selected" });
+exports.saveFile = async (req, res) => {
+  const { fileName, uploadId, parts, fileSize, bucketFileName } = req.body
+  const { sub } = req.user
+  let id = req.query.id
 
-    const id = req.query.id === "null" ? null : req.query.id;
+  id = id === "null" ? null : id
 
-    try {
-      await Folder.updateOne(
-        {
-          name: req.file.originalname,
-          userId: req.user.sub,
-          parentId: id,
-          isDir: false,
-        },
-        { $set: { size: req.file.size } },
-        { upsert: true }
-      );
+  const promises = []
 
+  promises.push(
+    fileService.completeMultipartUpload(uploadId, sub, bucketFileName, parts)
+  )
+
+  promises.push(
+    Folder.updateOne(
+      {
+        name: fileName,
+        bucketFileName,
+        userId: req?.user?.sub,
+        parentId: id,
+        isDir: false,
+      },
+      { $set: { size: fileSize } },
+      { upsert: true }
+    )
+  )
+  try {
+    const result = await Promise.all(promises)
+
+    if (result[0])
       return res.json({
-        success: true,
-        code: 200,
-        message: "File added successfully",
-      });
-    } catch (error) {
-      console.log(error);
-      return res.status(403).json({
-        error: "Failed to add file",
-      });
-    }
-  });
-};
+        message: "success",
+        data: "File upload is successful",
+      })
+  } catch (error) {
+    console.log(`API has error ${req.originalUrl} by user`, error)
+    return res.status(403).json({ error: "save upload failed" + error })
+  }
+}
+
+exports.abortUpload = async (req, res) => {
+  const { uploadId, bucketFileName } = req.body
+  const { sub } = req.user
+
+  try {
+    const result = await fileService.abortMultipartUpload(
+      sub,
+      bucketFileName,
+      uploadId
+    )
+    if (result)
+      res.json({ message: "success", data: "Upload aborted successfully" })
+  } catch (error) {
+    console.log("aborting upload failed ", error)
+    return res.status(403).json({ error: "aborting upload failed" + error })
+  }
+}
+
+exports.delete = async (req, res) => {
+  const { sub } = req.user
+  const { fileId } = req.params
+
+  try {
+    const found = await Folder.findOneAndDelete({
+      _id: fileId,
+      isDir: false,
+      userId: sub,
+    })
+
+    if (!found) return res.status(403).json({ error: "Folder not found" })
+
+    return res.status(200).json({
+      message: "File deleted successfully",
+    })
+  } catch (error) {
+    return res.status(403).json({
+      error: "Failed to delete file",
+    })
+  }
+}
+
+exports.download = async (req, res) => {
+  const { sub } = req.user
+  const { fileId } = req.params
+
+  try {
+    const found = await Folder.findOne({
+      _id: fileId,
+      userId: sub,
+      isDir: false,
+    })
+
+    if (!found) return res.status(403).json({ message: "File not found" })
+    const downloadUrl = await fileService.getPreSignedGetUrls(
+      sub,
+      found.name,
+      found.bucketFileName
+    )
+
+    return res.status(200).json({
+      message: "File download url",
+      url: downloadUrl,
+    })
+  } catch (error) {
+    return res.status(403).json({ message: "File not found" })
+  }
+}

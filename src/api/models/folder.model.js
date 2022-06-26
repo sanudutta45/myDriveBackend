@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+const mongoose = require("mongoose")
 
 const userSchema = new mongoose.Schema(
   {
@@ -7,7 +7,11 @@ const userSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-
+    bucketFileName: {
+      type: String,
+      required: false,
+      trim: true,
+    },
     size: {
       type: Number,
       default: 0,
@@ -38,10 +42,10 @@ const userSchema = new mongoose.Schema(
   {
     timestamps: true,
   }
-);
+)
 
 /**
  * @typedef user
  */
 
-module.exports = mongoose.model("folder", userSchema, "folders");
+module.exports = mongoose.model("folder", userSchema, "folders")
