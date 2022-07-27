@@ -10,6 +10,14 @@ const userSchema = new mongoose.Schema({
     unique: true,
     index: true,
   },
+  uploadLimit: {
+    type: Number,
+    default: 3,
+  },
+  maxFileSize: {
+    type: Number,
+    default: 1048576
+  },
   password:{
       type:String,
       required:true,

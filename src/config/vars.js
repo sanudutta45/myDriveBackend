@@ -14,4 +14,5 @@ module.exports = {
   jwtRefreshToken: process.env.JWT_REFRESH_TOKEN_DAYS,
   s3AccessKeyId: process.env.S3_ACCESS_KEY_ID,
   s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+  fileSlizeSize: process.env.SLICE_SIZE
 }

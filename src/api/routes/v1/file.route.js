@@ -16,14 +16,6 @@ const {
 const router = express.Router()
 
 router
-  .route("/upload_id/:fileName")
-  .get(
-    reqAuth.authorize,
-    validate(uploadIdSchema, vOptions),
-    controller.awsFileUploadId
-  )
-
-router
   .route("/signed_url")
   .post(
     reqAuth.authorize,

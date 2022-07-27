@@ -1,31 +1,49 @@
 const fileService = require("../services/awsS3.service")
 const Folder = require("../models/folder.model")
+const User = require("../models/user.model")
 
-exports.awsFileUploadId = async (req, res) => {
-  const { fileName } = req.params
-  const { sub } = req.user
-  try {
-    const uploadId = await fileService.createUploadId(fileName, sub)
-    res.status(200).json(uploadId)
-  } catch (error) {
-    console.log("Unable to get upload Id", error)
-    res.status(400).json({ error: "Unable to get upload Id" })
-  }
-}
+const { fileSlizeSize } = require("../../config/vars")
+// exports.awsFileUploadId = async (req, res) => {
+//   const { fileName } = req.params
+//   const { sub } = req.user
+//   try {
+//     const uploadId = await fileService.createUploadId(fileName, sub)
+//     res.status(200).json(uploadId)
+//   } catch (error) {
+//     console.log("Unable to get upload Id", error)
+//     res.status(400).json({ error: "Unable to get upload Id" })
+//   }
+// }
 
 exports.awsPresignedUrlParts = async (req, res) => {
-  const { uploadId, parts, bucketFileName } = req.body
+  const { fileSize, bucketFileName } = req.body
   const { sub } = req.user
 
   try {
+    const user = await User.findById(sub)
+    if (user?.uploadLimit <= 0)
+      return res.status(403).json({ error: "Max upload limit exceed" })
+    else if (fileSize > user?.maxFileSize)
+      return res.status(403).json({ error: "Max file size exceed" })
+
+    const uploadId = await fileService.createUploadId(bucketFileName, sub)
+
+    const noOfParts = Math.floor(fileSize / parseInt(fileSlizeSize)) + 1
+
     const partIndexMap = await fileService.getPreSignedPutUrls(
       sub,
       bucketFileName,
       uploadId,
-      parts
+      noOfParts
     )
 
-    return res.status(200).json(partIndexMap)
+    const result = {
+      uploadId,
+      partUrls: partIndexMap,
+      sliceSize: fileSlizeSize,
+    }
+
+    return res.status(200).json(result)
   } catch (error) {
     console.log("Error for Signed URL", error)
     return res
@@ -59,6 +77,10 @@ exports.saveFile = async (req, res) => {
       { $set: { size: fileSize } },
       { upsert: true }
     )
+  )
+
+  promises.push(
+    User.updateOne({ _id: req?.user?.sub }, { $inc: { uploadLimit: -1 } })
   )
   try {
     const result = await Promise.all(promises)

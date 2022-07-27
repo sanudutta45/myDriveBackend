@@ -27,8 +27,7 @@ module.exports = {
   signedUrlSchema: {
     body: Joi.object({
       bucketFileName: Joi.string().required(),
-      uploadId: Joi.string().required(),
-      parts: Joi.number().required(),
+      fileSize: Joi.number().required(),
     }),
   },
 
